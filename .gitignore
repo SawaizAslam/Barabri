@@ -1,0 +1,9 @@
+.build/
+.swiftpm/
+xcuserdata/
+DerivedData/
+*.xcodeproj/xcuserdata/
+
+# Course milestone documents remain local and are submitted separately.
+Documentation/
+AI_USAGE_LOG.md
