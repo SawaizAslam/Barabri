@@ -86,24 +86,6 @@ public struct PercentageSplitStrategy: SplitStrategy {
     }
 }
 
-public enum SplitType: Sendable {
-    case equal
-    case exact(Allocations)
-    case percentage([ParticipantID: Decimal])
-}
-
-public struct SplitStrategyFactory: Sendable {
-    public init() {}
-
-    public func make(_ type: SplitType) -> any SplitStrategy {
-        switch type {
-        case .equal: EqualSplitStrategy()
-        case .exact(let allocations): ExactAmountSplitStrategy(requestedAllocations: allocations)
-        case .percentage(let percentages): PercentageSplitStrategy(percentages: percentages)
-        }
-    }
-}
-
 private extension Decimal {
     func rounded(scale: Int) -> Decimal {
         var value = self
