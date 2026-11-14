@@ -11,6 +11,7 @@ Barabri stores everything in one JSON document, written by `JSONFileStore`
 - **IDs:** UUIDs are encoded as their standard string form. Participant IDs are encoded as the synthesised `Codable` object `{"value": "<id>"}`.
 - **Writes:** the whole document is encoded with pretty printing and sorted keys, then written atomically. A failed update leaves the previous file in place.
 - **Missing file:** a file that does not exist reads as an empty version 1 document.
+- **Record order:** saving a record whose `id` already exists replaces it in place. A new record is appended, so arrays keep first-insertion order.
 
 ## Top-level layout
 
