@@ -14,12 +14,18 @@ public protocol SplitStrategy: Sendable {
     func allocate(total: Decimal, participants: [ParticipantID]) throws -> Allocations
 }
 
+/// Shared checks run before any split strategy computes allocations.
+private func validateSplitInput(total: Decimal, participants: [ParticipantID]) throws {
+    guard total > 0 else { throw BarabriError.invalidAmount }
+    guard !participants.isEmpty else { throw BarabriError.noParticipants }
+    guard Set(participants).count == participants.count else { throw BarabriError.duplicateParticipant }
+}
+
 public struct EqualSplitStrategy: SplitStrategy {
     public init() {}
 
     public func allocate(total: Decimal, participants: [ParticipantID]) throws -> Allocations {
-        guard total > 0 else { throw BarabriError.invalidAmount }
-        guard !participants.isEmpty else { throw BarabriError.noParticipants }
+        try validateSplitInput(total: total, participants: participants)
         let share = (total / Decimal(participants.count)).rounded(scale: 2)
         var result = Dictionary(uniqueKeysWithValues: participants.map { ($0, share) })
         let difference = total - result.values.reduce(0, +)
@@ -36,11 +42,14 @@ public struct ExactAmountSplitStrategy: SplitStrategy {
     }
 
     public func allocate(total: Decimal, participants: [ParticipantID]) throws -> Allocations {
-        guard total > 0 else { throw BarabriError.invalidAmount }
-        guard !participants.isEmpty else { throw BarabriError.noParticipants }
-        guard Set(requestedAllocations.keys) == Set(participants),
-              requestedAllocations.values.allSatisfy({ $0 >= 0 }),
-              requestedAllocations.values.reduce(0, +) == total else {
+        try validateSplitInput(total: total, participants: participants)
+        guard Set(requestedAllocations.keys) == Set(participants) else {
+            throw BarabriError.participantNotFound
+        }
+        guard requestedAllocations.values.allSatisfy({ $0 >= 0 }) else {
+            throw BarabriError.invalidAmount
+        }
+        guard requestedAllocations.values.reduce(0, +) == total else {
             throw BarabriError.invalidAllocationTotal
         }
         return requestedAllocations
@@ -55,15 +64,19 @@ public struct PercentageSplitStrategy: SplitStrategy {
     }
 
     public func allocate(total: Decimal, participants: [ParticipantID]) throws -> Allocations {
-        guard total > 0 else { throw BarabriError.invalidAmount }
-        guard !participants.isEmpty else { throw BarabriError.noParticipants }
-        guard Set(percentages.keys) == Set(participants),
-              percentages.values.allSatisfy({ $0 >= 0 }),
-              percentages.values.reduce(0, +) == 100 else {
+        try validateSplitInput(total: total, participants: participants)
+        guard Set(percentages.keys) == Set(participants) else {
+            throw BarabriError.participantNotFound
+        }
+        guard percentages.values.allSatisfy({ $0 >= 0 }) else {
+            throw BarabriError.invalidAmount
+        }
+        guard percentages.values.reduce(0, +) == 100 else {
             throw BarabriError.invalidPercentageTotal
         }
+        // Keys were verified to match participants above, so the default is never used.
         let raw = participants.reduce(into: Allocations()) { result, participant in
-            result[participant] = (total * percentages[participant]!) / 100
+            result[participant] = (total * (percentages[participant] ?? 0)) / 100
         }
         let rounded = raw.mapValues { $0.rounded(scale: 2) }
         let difference = total - rounded.values.reduce(0, +)
