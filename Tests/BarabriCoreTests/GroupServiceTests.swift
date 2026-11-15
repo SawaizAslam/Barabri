@@ -188,4 +188,185 @@ final class GroupServiceTests: XCTestCase {
         XCTAssertEqual(storedFlat?.members.map(\.id), [ali])
         XCTAssertEqual(storedTrip?.members.map(\.id), [ali])
     }
+
+    // MARK: - Member removal
+
+    func testRemoveMemberReturnsGroupWithoutThatMemberAndKeepsOrder() async throws {
+        let group = try await service.createGroup(name: "Flat")
+        let ali = ParticipantID("ali")
+        let ahmed = ParticipantID("ahmed")
+        let sara = ParticipantID("sara")
+        _ = try await service.addMember(toGroup: group.id, id: ali, name: "Ali")
+        _ = try await service.addMember(toGroup: group.id, id: ahmed, name: "Ahmed")
+        _ = try await service.addMember(toGroup: group.id, id: sara, name: "Sara")
+
+        let updated = try await service.removeMember(fromGroup: group.id, id: ahmed)
+
+        XCTAssertEqual(
+            updated.members,
+            [Member(id: ali, name: "Ali"), Member(id: sara, name: "Sara")]
+        )
+
+        let stored = try await repository.group(id: group.id)
+        XCTAssertEqual(stored?.members, updated.members)
+    }
+
+    func testRemoveMemberNotInGroupThrowsMemberNotFoundAndLeavesGroupUnchanged() async throws {
+        let group = try await service.createGroup(name: "Flat")
+        let ali = ParticipantID("ali")
+        _ = try await service.addMember(toGroup: group.id, id: ali, name: "Ali")
+
+        do {
+            _ = try await service.removeMember(fromGroup: group.id, id: ParticipantID("ahmed"))
+            XCTFail("expected an error")
+        } catch {
+            XCTAssertEqual(error as? BarabriError, .memberNotFound)
+        }
+
+        let stored = try await repository.group(id: group.id)
+        XCTAssertEqual(stored?.members, [Member(id: ali, name: "Ali")])
+    }
+
+    func testRemoveMemberFromUnknownGroupThrowsGroupNotFound() async throws {
+        do {
+            _ = try await service.removeMember(fromGroup: UUID(), id: ParticipantID("ali"))
+            XCTFail("expected an error")
+        } catch {
+            XCTAssertEqual(error as? BarabriError, .groupNotFound)
+        }
+    }
+
+    // MARK: - Participant boundary
+
+    /// Creates a group whose members are Ali and Ahmed, and returns the group.
+    private func makeGroupWithAliAndAhmed() async throws -> ExpenseGroup {
+        let group = try await service.createGroup(name: "Flat")
+        _ = try await service.addMember(toGroup: group.id, id: ParticipantID("ali"), name: "Ali")
+        return try await service.addMember(toGroup: group.id, id: ParticipantID("ahmed"), name: "Ahmed")
+    }
+
+    func testValidateParticipantsSucceedsWhenPayerAndParticipantsAreMembers() async throws {
+        let group = try await makeGroupWithAliAndAhmed()
+
+        try await service.validateParticipants(
+            groupID: group.id,
+            payer: ParticipantID("ali"),
+            participants: [ParticipantID("ali"), ParticipantID("ahmed")]
+        )
+    }
+
+    func testValidateParticipantsSucceedsForSubsetOfMembers() async throws {
+        let group = try await makeGroupWithAliAndAhmed()
+
+        try await service.validateParticipants(
+            groupID: group.id,
+            payer: ParticipantID("ali"),
+            participants: [ParticipantID("ali")]
+        )
+    }
+
+    func testValidateParticipantsForUnknownGroupThrowsGroupNotFound() async throws {
+        do {
+            try await service.validateParticipants(
+                groupID: UUID(),
+                payer: ParticipantID("ali"),
+                participants: [ParticipantID("ali")]
+            )
+            XCTFail("expected an error")
+        } catch {
+            XCTAssertEqual(error as? BarabriError, .groupNotFound)
+        }
+    }
+
+    func testValidateParticipantsWithEmptyListThrowsNoParticipants() async throws {
+        let group = try await makeGroupWithAliAndAhmed()
+
+        do {
+            try await service.validateParticipants(
+                groupID: group.id,
+                payer: ParticipantID("ali"),
+                participants: []
+            )
+            XCTFail("expected an error")
+        } catch {
+            XCTAssertEqual(error as? BarabriError, .noParticipants)
+        }
+    }
+
+    func testValidateParticipantsWithDuplicateThrowsDuplicateParticipant() async throws {
+        let group = try await makeGroupWithAliAndAhmed()
+
+        do {
+            try await service.validateParticipants(
+                groupID: group.id,
+                payer: ParticipantID("ali"),
+                participants: [ParticipantID("ali"), ParticipantID("ali")]
+            )
+            XCTFail("expected an error")
+        } catch {
+            XCTAssertEqual(error as? BarabriError, .duplicateParticipant)
+        }
+    }
+
+    func testValidateParticipantsRejectsNonMemberParticipant() async throws {
+        let group = try await makeGroupWithAliAndAhmed()
+
+        do {
+            try await service.validateParticipants(
+                groupID: group.id,
+                payer: ParticipantID("ali"),
+                participants: [ParticipantID("ali"), ParticipantID("sara")]
+            )
+            XCTFail("expected an error")
+        } catch {
+            XCTAssertEqual(error as? BarabriError, .memberNotFound)
+        }
+    }
+
+    func testValidateParticipantsRejectsNonMemberPayer() async throws {
+        let group = try await makeGroupWithAliAndAhmed()
+
+        do {
+            try await service.validateParticipants(
+                groupID: group.id,
+                payer: ParticipantID("sara"),
+                participants: [ParticipantID("ali"), ParticipantID("ahmed")]
+            )
+            XCTFail("expected an error")
+        } catch {
+            XCTAssertEqual(error as? BarabriError, .memberNotFound)
+        }
+    }
+
+    func testValidateParticipantsRejectsPayerNotInParticipants() async throws {
+        let group = try await makeGroupWithAliAndAhmed()
+
+        do {
+            try await service.validateParticipants(
+                groupID: group.id,
+                payer: ParticipantID("ali"),
+                participants: [ParticipantID("ahmed")]
+            )
+            XCTFail("expected an error")
+        } catch {
+            XCTAssertEqual(error as? BarabriError, .payerNotFound)
+        }
+    }
+
+    func testValidateParticipantsRejectsMemberOfDifferentGroup() async throws {
+        _ = try await makeGroupWithAliAndAhmed()
+        let other = try await service.createGroup(name: "Trip")
+        _ = try await service.addMember(toGroup: other.id, id: ParticipantID("sara"), name: "Sara")
+
+        do {
+            try await service.validateParticipants(
+                groupID: other.id,
+                payer: ParticipantID("sara"),
+                participants: [ParticipantID("sara"), ParticipantID("ali")]
+            )
+            XCTFail("expected an error")
+        } catch {
+            XCTAssertEqual(error as? BarabriError, .memberNotFound)
+        }
+    }
 }
