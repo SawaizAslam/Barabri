@@ -28,9 +28,7 @@ public struct GroupService: Sendable {
         let trimmedID = id.value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty, !trimmedID.isEmpty else { throw BarabriError.emptyName }
 
-        guard var group = try await repository.group(id: groupID) else {
-            throw BarabriError.groupNotFound
-        }
+        var group = try await loadGroup(id: groupID)
         guard !group.members.contains(where: { $0.id == id }) else {
             throw BarabriError.duplicateMember
         }
@@ -40,15 +38,60 @@ public struct GroupService: Sendable {
         return group
     }
 
+    /// Removes a member and returns the updated group. Other members keep their order.
+    /// Throws `.groupNotFound` and `.memberNotFound`. Nothing is saved when it throws.
+    public func removeMember(fromGroup groupID: UUID, id: ParticipantID) async throws -> ExpenseGroup {
+        var group = try await loadGroup(id: groupID)
+        guard let index = group.members.firstIndex(where: { $0.id == id }) else {
+            throw BarabriError.memberNotFound
+        }
+
+        group.members.remove(at: index)
+        try await repository.save(group)
+        return group
+    }
+
+    /// Checks that a shared expense involves only members of the group. Saves nothing.
+    /// Throws `.groupNotFound`, `.noParticipants`, `.duplicateParticipant`, `.memberNotFound`
+    /// (payer or a participant is not a member), and `.payerNotFound` (payer is not in `participants`).
+    public func validateParticipants(
+        groupID: UUID,
+        payer: ParticipantID,
+        participants: [ParticipantID]
+    ) async throws {
+        let group = try await loadGroup(id: groupID)
+
+        guard !participants.isEmpty else { throw BarabriError.noParticipants }
+        guard Set(participants).count == participants.count else {
+            throw BarabriError.duplicateParticipant
+        }
+
+        let memberIDs = Set(group.members.map(\.id))
+        guard participants.allSatisfy({ memberIDs.contains($0) }) else {
+            throw BarabriError.memberNotFound
+        }
+        guard memberIDs.contains(payer) else {
+            throw BarabriError.memberNotFound
+        }
+        guard participants.contains(payer) else {
+            throw BarabriError.payerNotFound
+        }
+    }
+
     /// Throws `.groupNotFound`.
     public func group(id: UUID) async throws -> ExpenseGroup {
-        guard let group = try await repository.group(id: id) else {
-            throw BarabriError.groupNotFound
-        }
-        return group
+        try await loadGroup(id: id)
     }
 
     public func groups() async throws -> [ExpenseGroup] {
         try await repository.groups()
+    }
+
+    /// Loads a group or throws `.groupNotFound`.
+    private func loadGroup(id: UUID) async throws -> ExpenseGroup {
+        guard let group = try await repository.group(id: id) else {
+            throw BarabriError.groupNotFound
+        }
+        return group
     }
 }
