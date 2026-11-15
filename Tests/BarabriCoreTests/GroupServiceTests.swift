@@ -185,8 +185,8 @@ final class GroupServiceTests: XCTestCase {
 
         let storedFlat = try await service.group(id: flat.id)
         let storedTrip = try await service.group(id: trip.id)
-        XCTAssertEqual(storedFlat?.members.map(\.id), [ali])
-        XCTAssertEqual(storedTrip?.members.map(\.id), [ali])
+        XCTAssertEqual(storedFlat.members.map(\.id), [ali])
+        XCTAssertEqual(storedTrip.members.map(\.id), [ali])
     }
 
     // MARK: - Member removal
