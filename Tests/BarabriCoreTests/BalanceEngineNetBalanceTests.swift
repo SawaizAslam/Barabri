@@ -224,4 +224,45 @@ final class BalanceEngineNetBalanceTests: XCTestCase {
         XCTAssertEqual(result.receivables, [:])
         XCTAssertEqual(result.payables, [:])
     }
+
+    // 13. Overpaying creates a reverse obligation instead of losing the surplus.
+    func testOverpaidSettlementBecomesReverseObligation() throws {
+        let expense = try Expense(total: 3000, payer: ali, allocations: [ali: 1000, ahmed: 2000])
+        let payment = try settlement(from: ahmed, to: ali, amount: 2500, status: .completed)
+        let expenses = [expense]
+        let settlements = [payment]
+
+        let engine = BalanceEngine()
+        XCTAssertEqual(
+            engine.obligations(expenses: expenses, settlements: settlements),
+            [Obligation(debtor: ali, creditor: ahmed, amount: 500)]
+        )
+
+        let aliResult = engine.calculate(for: ali, expenses: expenses, settlements: settlements)
+        XCTAssertEqual(aliResult.payables, [ahmed: 500])
+        XCTAssertEqual(aliResult.receivables, [:])
+
+        let ahmedResult = engine.calculate(for: ahmed, expenses: expenses, settlements: settlements)
+        XCTAssertEqual(ahmedResult.receivables, [ali: 500])
+
+        XCTAssertEqual(
+            engine.outstanding(from: ali, to: ahmed, expenses: expenses, settlements: settlements),
+            500
+        )
+        XCTAssertEqual(
+            engine.outstanding(from: ahmed, to: ali, expenses: expenses, settlements: settlements),
+            0
+        )
+    }
+
+    // 14. A settlement with no matching expense is still owed back to the payer.
+    func testSettlementWithoutAnyExpenseIsOwedBack() throws {
+        let payment = try settlement(from: ahmed, to: ali, amount: 300, status: .completed)
+
+        let engine = BalanceEngine()
+        XCTAssertEqual(
+            engine.obligations(expenses: [], settlements: [payment]),
+            [Obligation(debtor: ali, creditor: ahmed, amount: 300)]
+        )
+    }
 }
