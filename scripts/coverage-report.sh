@@ -4,13 +4,26 @@ set -euo pipefail
 
 BIN_PATH="$(swift build --show-bin-path)"
 PROFDATA="$BIN_PATH/codecov/default.profdata"
-TEST_BINARY="$BIN_PATH/BarabriCoreTests.xctest/Contents/MacOS/BarabriCoreTests"
 
 if [[ ! -f "$PROFDATA" ]]; then
   echo "error: coverage profile not found at $PROFDATA" >&2
   echo "       run 'swift test --enable-code-coverage' first" >&2
   exit 1
 fi
+
+# The test bundle name differs between toolchains, so locate it rather than hard-coding it.
+shopt -s nullglob
+BUNDLES=("$BIN_PATH"/*.xctest)
+shopt -u nullglob
+
+if [[ ${#BUNDLES[@]} -eq 0 ]]; then
+  echo "error: no .xctest bundle found in $BIN_PATH" >&2
+  echo "       run 'swift test --enable-code-coverage' first" >&2
+  exit 1
+fi
+
+BUNDLE="${BUNDLES[0]}"
+TEST_BINARY="$BUNDLE/Contents/MacOS/$(basename "$BUNDLE" .xctest)"
 
 if [[ ! -f "$TEST_BINARY" ]]; then
   echo "error: test binary not found at $TEST_BINARY" >&2
