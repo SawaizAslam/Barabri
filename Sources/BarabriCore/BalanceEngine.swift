@@ -65,18 +65,26 @@ extension BalanceEngine {
     /// Each expense adds every non-payer's positive share to what that person owes the payer.
     /// Each `.completed` settlement subtracts its amount from what `from` owes `to`.
     /// `.pending` settlements are ignored. For each pair of people, the two directions are
-    /// offset against each other, leaving at most one obligation per pair.
+    /// offset against each other, leaving at most one obligation per pair. A settlement larger
+    /// than the debt it pays shows up as an obligation in the other direction.
     ///
     /// Returns only amounts greater than zero, sorted by debtor, then creditor.
     public func obligations(expenses: [Expense], settlements: [Settlement] = []) -> [Obligation] {
         let owes = grossDebts(expenses: expenses, settlements: settlements)
 
+        var visited = Set<DebtKey>()
         var result: [Obligation] = []
         for (key, gross) in owes {
-            let reverse = owes[DebtKey(debtor: key.creditor, creditor: key.debtor), default: 0]
-            let net = gross - reverse
+            guard !visited.contains(key) else { continue }
+            let reverseKey = DebtKey(debtor: key.creditor, creditor: key.debtor)
+            visited.insert(key)
+            visited.insert(reverseKey)
+
+            let net = gross - owes[reverseKey, default: 0]
             if net > 0 {
                 result.append(Obligation(debtor: key.debtor, creditor: key.creditor, amount: net))
+            } else if net < 0 {
+                result.append(Obligation(debtor: key.creditor, creditor: key.debtor, amount: -net))
             }
         }
 
