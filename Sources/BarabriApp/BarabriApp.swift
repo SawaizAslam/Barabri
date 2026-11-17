@@ -37,6 +37,7 @@ struct BarabriApp: App {
 
 struct DashboardView: View {
     @StateObject private var viewModel: DashboardViewModel
+    @State private var activeForm: EntryForm?
 
     init(environment: AppEnvironment) {
         _viewModel = StateObject(wrappedValue: DashboardViewModel(environment: environment))
@@ -56,6 +57,12 @@ struct DashboardView: View {
                     SummaryRow(title: "You owe others", value: viewModel.payablesText)
                 }
 
+                Section("Add") {
+                    Button("Add personal expense") { activeForm = .personalExpense }
+                    Button("Add group expense") { activeForm = .groupExpense }
+                    Button("Record settlement") { activeForm = .settlement }
+                }
+
                 if let errorMessage = viewModel.errorMessage {
                     Section {
                         Text(errorMessage)
@@ -66,8 +73,24 @@ struct DashboardView: View {
             .navigationTitle("Barabri")
             .task { await viewModel.load() }
             .refreshable { await viewModel.load() }
+            .sheet(item: $activeForm) { form in
+                switch form {
+                case .personalExpense:
+                    AddPersonalExpenseForm(viewModel: viewModel)
+                case .groupExpense:
+                    AddGroupExpenseForm(viewModel: viewModel)
+                case .settlement:
+                    RecordSettlementForm(viewModel: viewModel)
+                }
+            }
         }
     }
+}
+
+private enum EntryForm: String, Identifiable {
+    case personalExpense, groupExpense, settlement
+
+    var id: String { rawValue }
 }
 
 private struct SummaryRow: View {
