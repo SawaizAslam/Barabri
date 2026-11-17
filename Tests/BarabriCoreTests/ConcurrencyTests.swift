@@ -18,8 +18,10 @@ final class ConcurrencyTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Builds one store, the expense and group repositories over that same store, and one saved group: Ali, Ahmed and Sara.
-    private func makeFixture(fileURL: URL? = nil) async throws -> (store: JSONFileStore, service: ExpenseService, group: ExpenseGroup) {
+    /// Builds one store, the expense and group repositories over it, and one saved group of Ali, Ahmed and Sara.
+    private func makeFixture(
+        fileURL: URL? = nil
+    ) async throws -> (store: JSONFileStore, service: ExpenseService, group: ExpenseGroup) {
         let store = JSONFileStore(fileURL: fileURL)
         let expenses = JSONExpenseRepository(store: store)
         let groups = JSONGroupRepository(store: store)
@@ -36,15 +38,21 @@ final class ConcurrencyTests: XCTestCase {
         return (store, service, group)
     }
 
-    /// Starts `writeCount` child tasks at once. Task `i` records an equal three-way split of `300 + 3 * i`.
+    /// Starts `writeCount` child tasks at once. Task `index` records an equal three-way split of `300 + 3 * index`.
     private func addConcurrently(service: ExpenseService, groupID: UUID) async throws -> [SharedExpenseRecord] {
         let count = writeCount
         let payer = ParticipantID("ali")
         let participants = [ParticipantID("ali"), ParticipantID("ahmed"), ParticipantID("sara")]
         return try await withThrowingTaskGroup(of: SharedExpenseRecord.self) { taskGroup in
-            for i in 0..<count {
+            for index in 0..<count {
                 taskGroup.addTask {
-                    try await addExpenseNumber(i, service: service, groupID: groupID, payer: payer, participants: participants)
+                    try await addExpenseNumber(
+                        index,
+                        service: service,
+                        groupID: groupID,
+                        payer: payer,
+                        participants: participants
+                    )
                 }
             }
             var records: [SharedExpenseRecord] = []
@@ -109,9 +117,15 @@ final class ConcurrencyTests: XCTestCase {
 
         // Writers return nil. Readers return the number of records in the snapshot they saw.
         let results: [Int?] = try await withThrowingTaskGroup(of: Int?.self) { taskGroup in
-            for i in 0..<count {
+            for index in 0..<count {
                 taskGroup.addTask { () async throws -> Int? in
-                    _ = try await addExpenseNumber(i, service: service, groupID: groupID, payer: payer, participants: participants)
+                    _ = try await addExpenseNumber(
+                        index,
+                        service: service,
+                        groupID: groupID,
+                        payer: payer,
+                        participants: participants
+                    )
                     return nil
                 }
             }
@@ -164,17 +178,27 @@ final class ConcurrencyTests: XCTestCase {
         let participants = [ParticipantID("ali"), ParticipantID("ahmed"), ParticipantID("sara")]
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
-            for i in 0..<50 {
+            for index in 0..<50 {
                 taskGroup.addTask {
-                    _ = try await addExpenseNumber(i, service: service, groupID: groupID, payer: payer, participants: participants)
-                }
-                taskGroup.addTask {
-                    try await budgetRepository.save(
-                        PersonalExpense(budgetID: budgetID, title: "Personal \(i)", amount: Money(Decimal(10 + i)))
+                    _ = try await addExpenseNumber(
+                        index,
+                        service: service,
+                        groupID: groupID,
+                        payer: payer,
+                        participants: participants
                     )
                 }
                 taskGroup.addTask {
-                    try await groupRepository.save(ExpenseGroup(name: "Group \(i)"))
+                    try await budgetRepository.save(
+                        PersonalExpense(
+                            budgetID: budgetID,
+                            title: "Personal \(index)",
+                            amount: Money(Decimal(10 + index))
+                        )
+                    )
+                }
+                taskGroup.addTask {
+                    try await groupRepository.save(ExpenseGroup(name: "Group \(index)"))
                 }
             }
             try await taskGroup.waitForAll()
@@ -192,10 +216,10 @@ final class ConcurrencyTests: XCTestCase {
 
 // MARK: - File-scope helpers
 
-/// Adds expense number `i`: total `300 + 3 * i`, equal split across three participants, paid by the first one.
+/// Adds expense number `index`: total `300 + 3 * index`, equal split across three participants, paid by the first one.
 /// Free functions keep the child-task closures from capturing the test case.
 private func addExpenseNumber(
-    _ i: Int,
+    _ index: Int,
     service: ExpenseService,
     groupID: UUID,
     payer: ParticipantID,
@@ -203,8 +227,8 @@ private func addExpenseNumber(
 ) async throws -> SharedExpenseRecord {
     try await service.addExpense(
         groupID: groupID,
-        title: "Expense \(i)",
-        total: Decimal(300 + 3 * i),
+        title: "Expense \(index)",
+        total: Decimal(300 + 3 * index),
         payer: payer,
         participants: participants,
         split: .equal
