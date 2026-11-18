@@ -52,7 +52,7 @@ final class JSONRepositoriesTests: XCTestCase {
             payer: ali,
             allocations: [
                 ali: Decimal(string: "1000.05")!,
-                ahmed: Decimal(string: "2000.05")!,
+                ahmed: Decimal(string: "2000.05")!
             ]
         )
         return try SharedExpenseRecord(

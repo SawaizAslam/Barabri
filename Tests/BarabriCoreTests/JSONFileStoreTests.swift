@@ -106,7 +106,7 @@ final class JSONFileStoreTests: XCTestCase {
 
         let rejected = ExpenseGroup(name: "Rejected")
         do {
-            try await store.update { (document: inout StoreDocument) throws -> Void in
+            try await store.update { (document: inout StoreDocument) throws in
                 document.groups.append(rejected)
                 throw BarabriError.invalidAmount
             }
@@ -127,7 +127,7 @@ final class JSONFileStoreTests: XCTestCase {
 
         let rejected = ExpenseGroup(name: "Rejected")
         do {
-            try await writer.update { (document: inout StoreDocument) throws -> Void in
+            try await writer.update { (document: inout StoreDocument) throws in
                 document.groups.append(rejected)
                 throw BarabriError.invalidAmount
             }
@@ -198,7 +198,7 @@ final class JSONFileStoreTests: XCTestCase {
             total: Decimal(string: "3000.10")!,
             allocations: [
                 ali: Decimal(string: "1000.05")!,
-                ahmed: Decimal(string: "2000.05")!,
+                ahmed: Decimal(string: "2000.05")!
             ]
         )
         try await JSONFileStore(fileURL: url).update { document in

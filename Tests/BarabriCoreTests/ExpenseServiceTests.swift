@@ -20,7 +20,7 @@ final class ExpenseServiceTests: XCTestCase {
             members: [
                 Member(id: ali, name: "Ali"),
                 Member(id: ahmed, name: "Ahmed"),
-                Member(id: sara, name: "Sara"),
+                Member(id: sara, name: "Sara")
             ]
         )
         try await groups.save(group)
