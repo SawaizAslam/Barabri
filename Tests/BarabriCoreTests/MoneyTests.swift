@@ -11,7 +11,7 @@ final class MoneyTests: XCTestCase {
     func testEncodesAmountAsDecimalStringSoNoPrecisionIsLost() throws {
         let money = try Money(Decimal(string: "1234.56")!)
 
-        let json = String(decoding: try JSONEncoder().encode([money]), as: UTF8.self)
+        let json = try XCTUnwrap(String(bytes: JSONEncoder().encode([money]), encoding: .utf8))
 
         XCTAssertEqual(json, "[\"1234.56\"]")
     }

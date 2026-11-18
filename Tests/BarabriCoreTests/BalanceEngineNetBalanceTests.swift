@@ -84,7 +84,7 @@ final class BalanceEngineNetBalanceTests: XCTestCase {
             engine.obligations(expenses: [expense]),
             [
                 Obligation(debtor: ahmed, creditor: ali, amount: 1000),
-                Obligation(debtor: sara, creditor: ali, amount: 1000),
+                Obligation(debtor: sara, creditor: ali, amount: 1000)
             ]
         )
 
