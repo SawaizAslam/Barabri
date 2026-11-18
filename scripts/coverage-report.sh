@@ -22,22 +22,36 @@ if [[ ${#BUNDLES[@]} -eq 0 ]]; then
   exit 1
 fi
 
-BUNDLE="${BUNDLES[0]}"
-TEST_BINARY="$BUNDLE/Contents/MacOS/$(basename "$BUNDLE" .xctest)"
+# Every test bundle contributes coverage, so every test binary is handed to llvm-cov.
+TEST_BINARIES=()
+for BUNDLE in "${BUNDLES[@]}"; do
+  TEST_BINARY="$BUNDLE/Contents/MacOS/$(basename "$BUNDLE" .xctest)"
 
-if [[ ! -f "$TEST_BINARY" ]]; then
-  echo "error: test binary not found at $TEST_BINARY" >&2
-  echo "       run 'swift test --enable-code-coverage' first" >&2
-  exit 1
-fi
+  if [[ ! -f "$TEST_BINARY" ]]; then
+    echo "error: test binary not found at $TEST_BINARY" >&2
+    echo "       run 'swift test --enable-code-coverage' first" >&2
+    exit 1
+  fi
+
+  echo "using test binary: $TEST_BINARY" >&2
+  TEST_BINARIES+=("$TEST_BINARY")
+done
+
+# The first binary is the positional argument; each further one is passed with -object.
+LLVM_COV_OBJECTS=()
+for ((i = 1; i < ${#TEST_BINARIES[@]}; i++)); do
+  LLVM_COV_OBJECTS+=(-object "${TEST_BINARIES[$i]}")
+done
 
 mkdir -p coverage
 
-xcrun llvm-cov report "$TEST_BINARY" \
+xcrun llvm-cov report "${TEST_BINARIES[0]}" \
+  ${LLVM_COV_OBJECTS[@]+"${LLVM_COV_OBJECTS[@]}"} \
   -instr-profile "$PROFDATA" \
   -ignore-filename-regex='(\.build|Tests)/' > coverage/coverage-report.txt
 
-xcrun llvm-cov export "$TEST_BINARY" \
+xcrun llvm-cov export "${TEST_BINARIES[0]}" \
+  ${LLVM_COV_OBJECTS[@]+"${LLVM_COV_OBJECTS[@]}"} \
   -instr-profile "$PROFDATA" \
   -ignore-filename-regex='(\.build|Tests)/' \
   -format=lcov > coverage/coverage.lcov
