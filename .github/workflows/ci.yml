@@ -25,6 +25,13 @@ jobs:
           path: coverage/
           if-no-files-found: error
 
+      - name: Concurrency tests, 20 repeated runs
+        run: |
+          for run in $(seq 1 20); do
+            echo "Concurrency run $run of 20"
+            swift test --skip-build --filter ConcurrencyTests
+          done
+
   lint:
     runs-on: macos-latest
     steps:
