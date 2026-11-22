@@ -9,5 +9,47 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build and test
-        run: swift test
+
+      - name: Build and test with coverage
+        run: swift test --enable-code-coverage
+
+      - name: Coverage report (llvm-cov)
+        run: |
+          ./scripts/coverage-report.sh
+          { echo '```'; cat coverage/coverage-report.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          if-no-files-found: error
+
+      - name: Concurrency tests, 20 repeated runs
+        run: |
+          for run in $(seq 1 20); do
+            echo "Concurrency run $run of 20"
+            swift test --skip-build --filter ConcurrencyTests
+          done
+
+  lint:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SwiftLint if missing
+        run: which swiftlint || brew install swiftlint
+
+      - name: SwiftLint
+        shell: bash
+        run: |
+          set -o pipefail
+          swiftlint version
+          swiftlint lint --reporter github-actions-logging | tee swiftlint-report.txt
+
+      - name: Upload SwiftLint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swiftlint-report
+          path: swiftlint-report.txt
