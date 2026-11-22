@@ -1,0 +1,14 @@
+included:
+  - Sources
+  - Tests
+excluded:
+  - .build
+reporter: "xcode"
+
+# `to` pairs with `from` for the receiver of a settlement (Settlement.to, recordSettlement(from:to:)).
+# Allowed by name so every other short identifier is still reported.
+# `id` is SwiftLint's own default exception (Identifiable.id); listing `excluded` replaces the default, so it is repeated.
+identifier_name:
+  excluded:
+    - id
+    - to

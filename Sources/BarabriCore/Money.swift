@@ -17,7 +17,10 @@ public struct Money: Equatable, Hashable, Codable, Sendable {
         let text = try container.decode(String.self)
         guard Self.isPlainDecimal(text),
               let value = Decimal(string: text, locale: Locale(identifier: "en_US_POSIX")) else {
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "\"\(text)\" is not a decimal amount.")
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "\"\(text)\" is not a decimal amount."
+            )
         }
         do {
             try self.init(value)
