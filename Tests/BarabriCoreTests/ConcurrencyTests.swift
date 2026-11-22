@@ -18,6 +18,18 @@ final class ConcurrencyTests: XCTestCase {
 
     // MARK: - Helpers
 
+    /// The group used by every test here: Ali, Ahmed and Sara.
+    private func makeTripGroup() -> ExpenseGroup {
+        ExpenseGroup(
+            name: "Trip",
+            members: [
+                Member(id: ali, name: "Ali"),
+                Member(id: ahmed, name: "Ahmed"),
+                Member(id: sara, name: "Sara")
+            ]
+        )
+    }
+
     /// Builds one store, the expense and group repositories over it, and one saved group of Ali, Ahmed and Sara.
     private func makeFixture(
         fileURL: URL? = nil
@@ -25,14 +37,7 @@ final class ConcurrencyTests: XCTestCase {
         let store = JSONFileStore(fileURL: fileURL)
         let expenses = JSONExpenseRepository(store: store)
         let groups = JSONGroupRepository(store: store)
-        let group = ExpenseGroup(
-            name: "Trip",
-            members: [
-                Member(id: ali, name: "Ali"),
-                Member(id: ahmed, name: "Ahmed"),
-                Member(id: sara, name: "Sara"),
-            ]
-        )
+        let group = makeTripGroup()
         try await groups.save(group)
         let service = ExpenseService(expenses: expenses, groups: groups)
         return (store, service, group)
@@ -85,7 +90,7 @@ final class ConcurrencyTests: XCTestCase {
             obligations,
             [
                 Obligation(debtor: ahmed, creditor: ali, amount: 14_950),
-                Obligation(debtor: sara, creditor: ali, amount: 14_950),
+                Obligation(debtor: sara, creditor: ali, amount: 14_950)
             ]
         )
     }
@@ -160,14 +165,7 @@ final class ConcurrencyTests: XCTestCase {
         let budgetRepository = JSONBudgetRepository(store: store)
         let service = ExpenseService(expenses: expenseRepository, groups: groupRepository)
 
-        let trip = ExpenseGroup(
-            name: "Trip",
-            members: [
-                Member(id: ali, name: "Ali"),
-                Member(id: ahmed, name: "Ahmed"),
-                Member(id: sara, name: "Sara"),
-            ]
-        )
+        let trip = makeTripGroup()
         try await groupRepository.save(trip)
         let budget = Budget(name: "November", limit: try Money(100_000))
         try await budgetRepository.save(budget)
