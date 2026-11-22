@@ -11,6 +11,7 @@ let package = Package(
     targets: [
         .target(name: "BarabriCore"),
         .executableTarget(name: "BarabriApp", dependencies: ["BarabriCore"]),
-        .testTarget(name: "BarabriCoreTests", dependencies: ["BarabriCore"])
+        .testTarget(name: "BarabriCoreTests", dependencies: ["BarabriCore"]),
+        .testTarget(name: "BarabriAppTests", dependencies: ["BarabriApp", "BarabriCore"])
     ]
 )
