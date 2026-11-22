@@ -31,28 +31,8 @@ struct AppEnvironment: Sendable {
             groups: groupRepository
         )
 
-        let budget: Budget
-        if let existing = try await budgetRepository.budgets().first {
-            budget = existing
-        } else {
-            budget = try await budgetService.createBudget(name: "Monthly budget", limit: 50000)
-        }
-
-        let group: ExpenseGroup
-        if let existing = try await groupService.groups().first {
-            group = existing
-        } else {
-            var created = try await groupService.createGroup(name: "Flatmates")
-            let members: [(id: String, name: String)] = [("ali", "Ali"), ("ahmed", "Ahmed"), ("sara", "Sara")]
-            for member in members {
-                created = try await groupService.addMember(
-                    toGroup: created.id,
-                    id: ParticipantID(member.id),
-                    name: member.name
-                )
-            }
-            group = created
-        }
+        let budget = try await defaultBudget(repository: budgetRepository, service: budgetService)
+        let group = try await defaultGroup(service: groupService)
 
         let user = ParticipantID("ali")
         let facade = DashboardFacade(
@@ -72,5 +52,33 @@ struct AppEnvironment: Sendable {
             settlementService: settlementService,
             facade: facade
         )
+    }
+
+    /// The first stored budget, or a new "Monthly budget" (limit 50000) when there is none.
+    private static func defaultBudget(
+        repository: JSONBudgetRepository,
+        service: BudgetService
+    ) async throws -> Budget {
+        if let existing = try await repository.budgets().first {
+            return existing
+        }
+        return try await service.createBudget(name: "Monthly budget", limit: 50000)
+    }
+
+    /// The first stored group, or a new "Flatmates" group with Ali, Ahmed and Sara when there is none.
+    private static func defaultGroup(service: GroupService) async throws -> ExpenseGroup {
+        if let existing = try await service.groups().first {
+            return existing
+        }
+        var created = try await service.createGroup(name: "Flatmates")
+        let members: [(id: String, name: String)] = [("ali", "Ali"), ("ahmed", "Ahmed"), ("sara", "Sara")]
+        for member in members {
+            created = try await service.addMember(
+                toGroup: created.id,
+                id: ParticipantID(member.id),
+                name: member.name
+            )
+        }
+        return created
     }
 }
